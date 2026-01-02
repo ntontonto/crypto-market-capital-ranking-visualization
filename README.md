@@ -59,9 +59,25 @@ Automatically generates a 60-second YouTube Short (9:16) visualizing:
     ```
 
     **Output**: Saved to `./out/crypto_summary_YYYY-MM-DD.mp4`.
-
+    
     **Other Options**:
     *   `--dry-run`: Fetch data only, skip video generation.
+    
+## Video Layout & Safe Area (YouTube Shorts)
+
+This project targets **YouTube Shorts (9:16, 1080x1920)**.
+
+**Safe Area System**:
+To prevent "Tier-A" content (Titles, Tickers, Values) from being hidden by the Shorts UI (Like buttons, Channel Name, Search bar), we enforce strict layout margins:
+
+*   **Left**: 1.0 unit (120px)
+*   **Right**: 2.0 units (240px) - *Reserved for Action Buttons*
+*   **Top**: 1.83 units (220px) - *Reserved for Search/Back*
+*   **Bottom**: 2.4 units (288px) - *Reserved for Titles/Desc*
+
+**Debug Overlay**:
+You can visualize the safe area by setting `DEBUG_SAFE = True` in `src/video_generator.py`. A red rectangle will appear, indicating the usable canvas.
+
 
 ## Input JSON Specification
 

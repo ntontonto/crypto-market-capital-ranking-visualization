@@ -569,39 +569,87 @@ class CryptoRankingShorts(Scene):
         self.wait(duration - 6)
 
     def render_signal_board(self, duration):
-        """Scene 3: Marketing Signal Board"""
-        metrics = self._compute_metrics()
-        if not metrics:
+        """Scene 3: Marketing Signal Board with Heatmap"""
+        metrics_data = self._compute_metrics()
+        if not metrics_data:
             return
             
+        metrics_map = metrics_data.get('metrics_map', {})
+        # Flatten metrics to list for grid
+        # self.data["top30_metrics"] is the source list, already sorted by Rank (Mcap) usually?
+        # Let's use the list directly to preserve Top 30 Mcap order 
+        # (Top Left = Bitcoin, etc. usually makes sense)
+        metrics_list = self.data.get("top30_metrics", [])
+            
         # Title
-        title = Text("Market Signals", font_size=48, color=BLUE).to_edge(UP, buff=1.5)
+        title = Text("Market Signals", font_size=40, color=BLUE).to_edge(UP, buff=1.0)
         
-        # 1. Mood Panel
-        mood = metrics['mood']
+        # 1. Header: Mood & Breadth Text
+        mood = metrics_data['mood']
         mood_color = GREEN if mood == "RISK-ON" else (RED if mood == "RISK-OFF" else GRAY)
         
-        p1_label = Text("Market Mood:", font_size=36, color=WHITE)
-        p1_val = Text(mood, font_size=48, weight=BOLD, color=mood_color)
-        p1_group = VGroup(p1_label, p1_val).arrange(DOWN, buff=0.2)
+        b = metrics_data['breadth']
+        breadth_str = f"{b['green']}/{b['total']} Up"
         
-        # 2. Breadth Panel
-        b = metrics['breadth']
-        p2_label = Text("Breadth (Top 30):", font_size=36, color=WHITE)
-        p2_val = Text(f"{b['green']}/{b['total']} Green ({int(b['pct'])}%)", font_size=40, color=WHITE)
-        p2_group = VGroup(p2_label, p2_val).arrange(DOWN, buff=0.2)
+        header_text = Text(f"{mood} | {breadth_str}", font_size=36, color=mood_color)
+        header_text.next_to(title, DOWN, buff=0.3)
         
-        # 3. Momentum Panel
-        mom = metrics['momentum'] # list of (cid, sym, score)
+        # 2. Heatmap Grid (5 cols x 6 rows = 30)
+        grid_group = VGroup()
+        
+        # Cell settings
+        cell_size = 1.4
+        padding = 0.1
+        
+        for i, m in enumerate(metrics_list[:30]): # Ensure max 30
+            c24 = m.get('change_24h_pct', 0)
+            sym = m.get('symbol', '?')
+            
+            # Color logic
+            if c24 > 0:
+                fill_col = GREEN
+                # Optional: Intensity? For simplicity: standard GREEN
+                if c24 > 5.0: fill_col = "#00FF00" # Brighter
+            elif c24 < 0:
+                fill_col = RED
+                if c24 < -5.0: fill_col = "#FF0000" # Bright Red
+            else:
+                fill_col = GRAY
+                
+            cell = Square(side_length=cell_size)
+            cell.set_fill(fill_col, opacity=0.8)
+            cell.set_stroke(BLACK, width=2)
+            
+            label = Text(sym, font_size=20, weight=BOLD, color=BLACK if c24 > 0 else WHITE)
+            # Scale text if too long
+            if len(sym) > 4:
+                label.scale(0.8)
+                
+            cell_grp = VGroup(cell, label)
+            grid_group.add(cell_grp)
+            
+        # Arrange in grid
+        grid_group.arrange_in_grid(rows=6, cols=5, buff=padding)
+        grid_group.center()
+        
+        # 3. Footer: Momentum
+        mom = metrics_data['momentum'] # list of (cid, sym, score)
         syms = ", ".join([x[1] for x in mom])
         
-        p3_label = Text("Momentum Watch:", font_size=36, color=WHITE)
-        p3_val = Text(syms, font_size=40, color=GOLD)
-        p3_group = VGroup(p3_label, p3_val).arrange(DOWN, buff=0.2)
+        footer_label = Text("Momentum Watch:", font_size=28, color=GRAY)
+        footer_val = Text(syms, font_size=32, color=GOLD)
+        footer_group = VGroup(footer_label, footer_val).arrange(DOWN, buff=0.15)
+        footer_group.to_edge(DOWN, buff=1.5)
         
-        # Layout
-        main_group = VGroup(p1_group, p2_group, p3_group).arrange(DOWN, buff=1.0)
-        main_group.center()
+        # Animation
+        self.play(FadeIn(title), FadeIn(header_text))
         
-        self.play(FadeIn(title), FadeIn(main_group, shift=UP))
-        self.wait(duration - 2)
+        # Animate Grid: Lagged Start
+        self.play(
+            LaggedStart(*[FadeIn(c, shift=UP*0.5) for c in grid_group], lag_ratio=0.05),
+            run_time=3
+        )
+        
+        self.play(Write(footer_group))
+        
+        self.wait(duration - 5)

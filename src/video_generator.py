@@ -4,6 +4,7 @@ import datetime
 import numpy as np
 import math
 import statistics
+import os
 
 # Configure for Vertical 9:16
 config.pixel_height = 1920
@@ -90,11 +91,13 @@ class CryptoRankingShorts(Scene):
                 val = item.get('price', mcap) 
                 
                 symbol = item['symbol'].upper()
+                img = item.get('image', '')
                 
                 if cid not in coin_series:
                     coin_series[cid] = {
                         "color": self._get_coin_color(symbol),
                         "symbol": symbol,
+                        "image": img,
                         "data": []
                     }
                 coin_series[cid]["data"].append((day_idx, val))
@@ -129,7 +132,8 @@ class CryptoRankingShorts(Scene):
             details_map[cid] = {
                 "coords": normalized_coords,
                 "color": info['color'],
-                "symbol": info['symbol']
+                "symbol": info['symbol'],
+                "image": info.get('image', '')
             }
             
         # Filter "Best Return" Logic
@@ -238,7 +242,7 @@ class CryptoRankingShorts(Scene):
         time_tracker = ValueTracker(0)
 
         lines_group = VGroup()
-        labels_group = VGroup()
+        labels_group = Group()
         
         coin_mobjects = {} 
 
@@ -254,8 +258,11 @@ class CryptoRankingShorts(Scene):
             full_points = [axes.c2p(x, y) for x, y in coords]
             line.set_points_as_corners(full_points)
             
-            label_container = VGroup()
-            dot = Dot(color=color, radius=0.1)
+            # Use Group to hold ImageMobject (non-vector) + Text (vector)
+            label_container = Group()
+            dot = self._create_icon(details.get('image'), size=0.5)
+            # Ensure it's centered on point later
+            # Dot is center-anchored by default, ImageMobject is too.
             
             # Label: SYM (+13.5%)
             # We use a VGroup for text parts to keep them aligned
@@ -413,6 +420,17 @@ class CryptoRankingShorts(Scene):
 
     # --- Metrics & Helpers ---
 
+    def _create_icon(self, image_path, size=0.5):
+        """Creates an ImageMobject from path, or a fallback Dot."""
+        if image_path and os.path.exists(image_path):
+            try:
+                img = ImageMobject(image_path)
+                img.height = size
+                return img
+            except:
+                pass
+        return Dot(radius=size/4, color=GRAY)
+
     def _compute_metrics(self):
         """Compute all marketing metrics from top30_metrics in input."""
         metrics = self.data.get("top30_metrics", [])
@@ -499,21 +517,26 @@ class CryptoRankingShorts(Scene):
             sym = item['name'] 
             price = item['price']
             pct = item[pct_key]
+            img_path = item.get('image', '')
             
-            row = VGroup()
+            row = Group()
+            
+            # Icon
+            icon = self._create_icon(img_path, size=0.6)
+            
             # Symbol
             t_sym = Text(sym, font_size=32, weight=BOLD)
             # Price
             if price > 1.0:
-                p_str = f"${price:,.2f}"
+                p_str = f"\${price:,.2f}"
             else:
-                p_str = f"${price:.4f}"
+                p_str = f"\${price:.4f}"
             t_price = Text(p_str, font_size=24, color=GRAY)
             # Pct
             sign = "+" if pct > 0 else ""
             t_pct = Text(f"{sign}{pct:.1f}%", font_size=32, color=color)
             
-            row.add(t_sym, t_price, t_pct)
+            row.add(icon, t_sym, t_price, t_pct)
             
             # CHECK UNUSUAL BADGE
             # Logic: |Z| >= 2.0 based on 7-day stats
@@ -536,7 +559,7 @@ class CryptoRankingShorts(Scene):
             return row
 
         # Gainers Group
-        g_group = VGroup()
+        g_group = Group()
         if gainers:
             head = Text("Gainers", font_size=36, color=GREEN).to_edge(LEFT, buff=1.0)
             g_group.add(head)
@@ -547,7 +570,7 @@ class CryptoRankingShorts(Scene):
             g_group.to_edge(LEFT, buff=1.0).shift(UP * 1.0)
             
         # Losers Group
-        l_group = VGroup()
+        l_group = Group()
         if losers:
             head = Text("Losers", font_size=36, color=RED).to_edge(LEFT, buff=1.0)
             l_group.add(head)

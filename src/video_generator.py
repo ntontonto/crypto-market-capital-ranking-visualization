@@ -87,8 +87,8 @@ class CryptoRankingShorts(MovingCameraScene):
             for item in day_entry.get('items', []):
                 cid = item['id']
                 mcap = item['market_cap']
-                # Use price if available, else fallback to mcap (for consistency with Scene 2)
-                val = item.get('price', mcap) 
+                # Use price strictly as requested
+                val = item.get('price', 0) 
                 
                 symbol = item['symbol'].upper()
                 img = item.get('image', '')
@@ -180,6 +180,7 @@ class CryptoRankingShorts(MovingCameraScene):
             
         if not all_y_values:
             y_min, y_max = 90, 110
+            y_mid = 100
         else:
             y_min = min(all_y_values)
             y_max = max(all_y_values)
@@ -193,7 +194,7 @@ class CryptoRankingShorts(MovingCameraScene):
             y_length=10,
             axis_config={"color": "#444444"},
             tips=False
-        ).to_edge(DOWN, buff=2.0)
+        ).to_edge(DOWN, buff=3.0) # Raised from 2.0 to 3.0 (10% lift)
         
         x_labels = VGroup()
         if len(days) == 7:
@@ -218,7 +219,30 @@ class CryptoRankingShorts(MovingCameraScene):
             stroke_opacity=0.5
         )
 
-        title = Text("Crypto Race: Who Won?", font_size=36, weight=BOLD).to_edge(UP, buff=1.5)
+        # Date Range Subtitle
+        start_date = top_data[0].get('date', 'Start')
+        end_date = top_data[-1].get('date', 'End')
+        
+        title = Text("Crypto price change", font_size=36, weight=BOLD)
+        subtitle = Text(f"{start_date} - {end_date}", font_size=24, color=GRAY)
+        
+        header_group = VGroup(title, subtitle).arrange(DOWN, buff=0.1)
+        # We want to place it fixed in frame.
+        # Initial placement relative to axes or screen?
+        # Let's fix it relative to the CAMERA FRAME.
+        
+        self.add(header_group)
+        
+        def update_header(m):
+            # Keep header 1.5 units from top of CURRENT camera frame
+            c = self.camera.frame.get_center()
+            h = self.camera.frame.get_height()
+            top_y = c[1] + h/2
+            m.move_to([c[0], top_y - 1.5, 0])
+            
+        header_group.add_updater(update_header)
+        # Initial update
+        update_header(header_group)
         
         # Camera Setup (Pre-FadeIn)
         self.camera.frame.save_state()
@@ -230,7 +254,7 @@ class CryptoRankingShorts(MovingCameraScene):
             FadeIn(x_labels),
             FadeIn(y_labels),
             Create(baseline),
-            Write(title),
+            Write(header_group),
             run_time=2
         )
 
@@ -256,7 +280,7 @@ class CryptoRankingShorts(MovingCameraScene):
             
             # Use Group to hold ImageMobject (non-vector) + Text (vector)
             label_container = Group()
-            dot = self._create_icon(details.get('image'), size=0.5)
+            dot = self._create_icon(details.get('image'), size=0.5, coin_id=cid)
             # Ensure it's centered on point later
             # Dot is center-anchored by default, ImageMobject is too.
             
@@ -433,8 +457,12 @@ class CryptoRankingShorts(MovingCameraScene):
 
     # --- Metrics & Helpers ---
 
-    def _create_icon(self, image_path, size=0.5):
-        """Creates an ImageMobject from path, or a fallback Dot."""
+    def _create_icon(self, image_path, size=0.5, coin_id=None):
+        """
+        Creates an ImageMobject from path, or a fallback Dot.
+        If image_path is faulty, tries assets/coins/{coin_id}.png.
+        """
+        # 1. Try provided path
         if image_path and os.path.exists(image_path):
             try:
                 img = ImageMobject(image_path)
@@ -442,6 +470,19 @@ class CryptoRankingShorts(MovingCameraScene):
                 return img
             except:
                 pass
+                
+        # 2. Try Fallback: assets/coins/{coin_id}.png
+        if coin_id:
+            fallback_path = f"assets/coins/{coin_id}.png"
+            if os.path.exists(fallback_path):
+                try:
+                    img = ImageMobject(fallback_path)
+                    img.height = size
+                    return img
+                except:
+                    pass
+        
+        # 3. Fallback to Dot
         return Dot(radius=size/4, color=GRAY)
 
     def _compute_metrics(self):
@@ -629,9 +670,9 @@ class CryptoRankingShorts(MovingCameraScene):
         mood_color = GREEN if mood == "RISK-ON" else (RED if mood == "RISK-OFF" else GRAY)
         
         b = metrics_data['breadth']
-        breadth_str = f"{b['green']}/{b['total']} Up"
+        breadth_val = b.get('pct', 50)
+        breadth_str = f"{breadth_val:.0f}% are gainers" # Fixed variable definition
         
-        header_text = Text(f"{mood} | {breadth_str}", font_size=36, color=mood_color)
         header_text = Text(f"{mood} | {breadth_str}", font_size=36, color=mood_color)
         header_text.next_to(title, DOWN, buff=0.3)
         

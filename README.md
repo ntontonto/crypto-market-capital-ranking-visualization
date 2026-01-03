@@ -59,9 +59,46 @@ Automatically generates a 60-second YouTube Short (9:16) visualizing:
     ```
 
     **Output**: Saved to `./out/crypto_summary_YYYY-MM-DD.mp4`.
-
-    **Other Options**:
+    
     *   `--dry-run`: Fetch data only, skip video generation.
+    *   `--no-music`: Disable background music.
+    *   `--music-volume`: Set music volume (default 0.15).
+
+## Audio / Background Music
+
+The generator automatically adds background music to the final video using FFmpeg.
+
+*   **Default File**: `assets/audio/music/idokay - Fall Down.mp3`
+*   **Behavior**:
+    *   Music is looped or truncated to match video duration.
+    *   Fades in (0.5s) and out (0.8s).
+    *   Silent video is deleted upon success; preserved on failure.
+
+**Changing Music**:
+Use the `--music-path` argument:
+```bash
+python main.py --music-path "assets/audio/music/my_song.mp3" --music-volume 0.2
+```
+
+**Troubleshooting Audio**:
+*   Ensure `ffmpeg` and `ffprobe` are installed/in your PATH.
+*   If mixing fails, the silent video remains in `./out`.
+    
+## Video Layout & Safe Area (YouTube Shorts)
+
+This project targets **YouTube Shorts (9:16, 1080x1920)**.
+
+**Safe Area System**:
+To prevent "Tier-A" content (Titles, Tickers, Values) from being hidden by the Shorts UI (Like buttons, Channel Name, Search bar), we enforce strict layout margins:
+
+*   **Left**: 1.0 unit (120px)
+*   **Right**: 2.0 units (240px) - *Reserved for Action Buttons*
+*   **Top**: 1.83 units (220px) - *Reserved for Search/Back*
+*   **Bottom**: 2.4 units (288px) - *Reserved for Titles/Desc*
+
+**Debug Overlay**:
+You can visualize the safe area by setting `DEBUG_SAFE = True` in `src/video_generator.py`. A red rectangle will appear, indicating the usable canvas.
+
 
 ## Input JSON Specification
 

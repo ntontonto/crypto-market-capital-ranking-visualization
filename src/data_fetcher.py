@@ -9,7 +9,43 @@ class CryptoDataFetcher:
     def __init__(self, cache_dir="./cache"):
         self.cache_dir = cache_dir
         self.api_url_base = "https://api.coingecko.com/api/v3"
+        self.api_key = self._load_api_key()
         
+        # Rate limit configuration
+        # Public: ~10-15 calls/min (safe) -> 4.0s delay
+        # Demo Key: 30 calls/min -> 2.2s delay (safe)
+        if self.api_key:
+            print("Configured matching CoinGecko Demo API Key. Using optimized rate limits (2.2s delay).")
+            self.sleep_duration = 2.2
+        else:
+            print("No API Key found. Using public rate limits (4.0s delay).")
+            self.sleep_duration = 4.0
+
+    def _load_api_key(self):
+        """
+        Manually parse .env file to find COINGECKO_API_KEY without external dependencies.
+        """
+        env_path = os.path.join(os.getcwd(), ".env")
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("COINGECKO_API_KEY="):
+                            return line.split("=", 1)[1].strip()
+            except Exception:
+                pass
+        return None
+
+    def _get_headers(self):
+        """Returns headers with API key if available."""
+        headers = {
+            "accept": "application/json"
+        }
+        if self.api_key:
+            headers["x-cg-demo-api-key"] = self.api_key
+        return headers
+
     def generate_input_json(self):
         """
         Orchestrates the fetching of all necessary data to produce the 'input.json' 
@@ -43,7 +79,7 @@ class CryptoDataFetcher:
             print(f"[{i+1}/{len(current_top)}] Fetching history for {coin_id}...")
             history = self._fetch_coin_history_7d(coin_id)
             history_map[coin_id] = history
-            time.sleep(4)
+            time.sleep(self.sleep_duration)
             
         # Determine 7 dates (today - 6 days through today)
         today = datetime.utcnow().date()
@@ -203,7 +239,7 @@ class CryptoDataFetcher:
             "price_change_percentage": "24h"
         }
         print("Fetching current top markets...")
-        resp = requests.get(url, params=params, timeout=10)
+        resp = requests.get(url, params=params, headers=self._get_headers(), timeout=10)
         resp.raise_for_status()
         return resp.json()
 
@@ -218,11 +254,11 @@ class CryptoDataFetcher:
             "interval": "daily" 
         }
         try:
-            resp = requests.get(url, params=params, timeout=10)
+            resp = requests.get(url, params=params, headers=self._get_headers(), timeout=10)
             if resp.status_code == 429:
                 print("Rate limit hit. Sleeping 60s...")
                 time.sleep(60)
-                resp = requests.get(url, params=params, timeout=10)
+                resp = requests.get(url, params=params, headers=self._get_headers(), timeout=10)
                 
             resp.raise_for_status()
             data = resp.json()
